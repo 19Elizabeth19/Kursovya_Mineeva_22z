@@ -1,31 +1,42 @@
 import * as readline from 'readline';
-import { insertDataIntoMongoDB } from './Excelread_inputMongo';
+import { insertDataInMongoDB } from './Excelread_inputMongo';
 import { getSchedule, getScheduleFromMongoDB } from './getSchedule';
 
+// Основная асинхронная функция для выполнения программы
 async function main() {
-    // Создание интерфейса командной строки и запрос у пользователя информации
+    // Создание интерфейса командной строки для взаимодействия с пользователем
     const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout
+      input: process.stdin, // Ввод 
+      output: process.stdout // Вывод 
     });
   
+    // Задаем пользователю вопрос и ожидаем ввода
     rl.question('Введите фамилию преподавателя, название группы (например, "22з") или номер аудитории (например, "1-467"): ', async (input) => {
-      const filePath = 'C:\\Users\\qwerty\\project1\\kursovya\\src\\Raspisanie.xlsx'; // Укажите актуальный путь к файлу Excel
-      const groupPattern = /^[0-9]{2}[а-я]{1}$/i; // Регулярное выражение для определения группы
-      const classroomPattern = /^\d{1,2}-\d{3}$/; // Регулярное выражение для определения аудитории
+
+      // Путь к файлу с расписанием
+      const filePath = 'C:\\Users\\qwerty\\project1\\kursovya\\src\\Raspisanie.xlsx';
+      
+      // Выражение для определения группы
+      const groupPattern = /^[0-9]{2}[а-я]{1}$/i;
+      // Выражение для определения аудитории
+      const classroomPattern = /^\d{1,2}-\d{3}$/;
   
       try {
-        await insertDataIntoMongoDB(filePath);
+        // Вставка данных из Excel файла в MongoDB
+        await insertDataInMongoDB(filePath);
+        // Проверка введенных данных на соответствие шаблону группы
         if (groupPattern.test(input)) {
-          // Фильтр для группы
+          // Создание фильтра для группы
           const groupFilter = (pair: { group: string; classroom: string; subject: string; }) => pair.group.includes(input);
+          // Получение и сохранение расписания для группы
           await getSchedule(groupFilter, `${input}_schedule.html`, `группы ${input}`);
         } else if (classroomPattern.test(input)) {
-          // Фильтр для аудитории
+          // Создание фильтра для аудитории
           const classroomFilter = (pair: { group: string; classroom: string; subject: string; }) => pair.classroom === input;
+          // Получение и сохранение расписания для аудитории
           await getSchedule(classroomFilter, `classroom_${input}_schedule.html`, `аудитории ${input}`);
         } else {
-          // В противном случае предполагаем, что это фамилия преподавателя и получаем расписание преподавателя
+          // Если введенные данные не соответствуют шаблонам группы или аудитории, предполагаем, что это фамилия преподавателя
           await getScheduleFromMongoDB(input);
         }
       } catch (error) {
@@ -34,6 +45,6 @@ async function main() {
         rl.close();
       }
     });
-  }
-  
-  main();
+}
+
+main();
