@@ -4,47 +4,52 @@ import { getSchedule, getScheduleFromMongoDB } from './getSchedule';
 
 // Основная асинхронная функция для выполнения программы
 async function main() {
-    // Создание интерфейса командной строки для взаимодействия с пользователем
-    const rl = readline.createInterface({
-      input: process.stdin, // Ввод 
-      output: process.stdout // Вывод 
-    });
-  
-    // Задаем пользователю вопрос и ожидаем ввода
-    rl.question('Введите фамилию преподавателя, название группы (например, "22з") или номер аудитории (например, "1-467"): ', async (input) => {
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout
+  });
 
-      // Путь к файлу с расписанием
-      const filePath = 'C:\\Users\\qwerty\\project1\\kursovya\\src\\Raspisanie.xlsx';
-      
-      // Выражение для определения группы
-      const groupPattern = /^[0-9]{2}[а-я]{1}$/i;
-      // Выражение для определения аудитории
-      const classroomPattern = /^\d{1,2}-\d{3}$/;
-  
-      try {
-        // Вставка данных из Excel файла в MongoDB
-        await insertDataInMongoDB(filePath);
-        // Проверка введенных данных на соответствие шаблону группы
-        if (groupPattern.test(input)) {
-          // Создание фильтра для группы
-          const groupFilter = (pair: { group: string; classroom: string; subject: string; }) => pair.group.includes(input);
-          // Получение и сохранение расписания для группы
-          await getSchedule(groupFilter, `${input}_schedule.html`, `группы ${input}`);
-        } else if (classroomPattern.test(input)) {
-          // Создание фильтра для аудитории
-          const classroomFilter = (pair: { group: string; classroom: string; subject: string; }) => pair.classroom === input;
-          // Получение и сохранение расписания для аудитории
-          await getSchedule(classroomFilter, `classroom_${input}_schedule.html`, `аудитории ${input}`);
-        } else {
-          // Если введенные данные не соответствуют шаблонам группы или аудитории, предполагаем, что это фамилия преподавателя
-          await getScheduleFromMongoDB(input);
+  rl.question('Введите 1 для загрузки расписания в базу данных или 2 для получения расписания: ', async (choice) => {
+    if (choice === '1') {
+      rl.question('Введите полный путь к файлу Excel с расписанием: ', async (filePath) => {
+        try {
+          await insertDataInMongoDB(filePath);
+          console.log('Расписание успешно загружено в базу данных.');
+        } catch (error) {
+          console.error('Произошла ошибка при загрузке расписания:', error);
+        } finally {
+          rl.close();
         }
-      } catch (error) {
-        console.error('Произошла ошибка:', error);
-      } finally {
-        rl.close();
-      }
-    });
+      });
+    } else if (choice === '2') {
+      rl.question('Введите фамилию преподавателя, название группы (например, "22з") или номер аудитории (например, "1-467"): ', async (input) => {
+        const groupPattern = /^[0-9]{2}[а-я]{1}$/i; // Регулярное выражение для определения группы
+        const classroomPattern = /^\d{1,2}-\d{3}$/; // Регулярное выражение для определения аудитории
+
+        try {
+          if (groupPattern.test(input)) {
+            // Фильтр для группы
+            const groupFilter = (pair: { group: string; classroom: string; subject: string; }) => pair.group.includes(input);
+            await getSchedule(groupFilter, `${input}_schedule.html`, `группы ${input}`);
+          } else if (classroomPattern.test(input)) {
+            // Фильтр для аудитории
+            const classroomFilter = (pair: { group: string; classroom: string; subject: string; }) => pair.classroom === input;
+            await getSchedule(classroomFilter, `classroom_${input}_schedule.html`, `аудитории ${input}`);
+          } else {
+            // В противном случае предполагаем, что это фамилия преподавателя и получаем расписание преподавателя
+            await getScheduleFromMongoDB(input);
+          }
+        } catch (error) {
+          console.error('Произошла ошибка:', error);
+        } finally {
+          rl.close();
+        }
+      });
+    } else {
+      console.log('Неверный выбор. Пожалуйста, введите 1 или 2.');
+      rl.close();
+    }
+  });
 }
 
 main();

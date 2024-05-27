@@ -5,8 +5,9 @@ import { MongoClient} from 'mongodb';
 export interface PairSchedule {
     group: string;
     classroom: string;
-    subject: string; 
-}
+    subject: string;
+    teacher: string;
+  }
 
 // Интерфейс для расписания на один день
 export interface DaySchedule {
@@ -32,6 +33,7 @@ const splitGroupAndClassroom = (cellContent: string): PairSchedule => {
     let group = '';
     let classroom = '';
     let subject = '';
+    let teacher = '';
 
     // Удаляем лишние точки с запятой из строки с группами
     const cleanedGroupString = cellContent.replace(/;+/g, ';').replace(/;+$/, '');
@@ -53,7 +55,7 @@ const splitGroupAndClassroom = (cellContent: string): PairSchedule => {
         subject = cleanedGroupString.trim();
     }
 
-    return { group, classroom, subject };
+    return { group, classroom, subject, teacher };
 };
 
 
@@ -100,7 +102,7 @@ async function ExcelReader(filePath: string): Promise<TeacherSchedule[]> {
                 // Если есть информация о группе и предмете, добавляем в расписание
                 if (groupAndClassroomOdd && subjectOdd) {
                     const { group, classroom } = splitGroupAndClassroom(groupAndClassroomOdd);
-                    dayScheduleOdd.pairs.push({ group, classroom, subject: subjectOdd });
+                    dayScheduleOdd.pairs.push({ group, classroom, subject: subjectOdd, teacher: teacherName  });
                 }
 
                 // Четная неделя
@@ -109,7 +111,7 @@ async function ExcelReader(filePath: string): Promise<TeacherSchedule[]> {
                 // Если есть информация о группе и предмете, добавляем в расписание
                 if (groupAndClassroomEven && subjectEven) {
                     const { group, classroom } = splitGroupAndClassroom(groupAndClassroomEven);
-                    dayScheduleEven.pairs.push({ group, classroom, subject: subjectEven });
+                    dayScheduleEven.pairs.push({ group, classroom, subject: subjectEven, teacher: teacherName  });
                 }
 
                 // Добавление сформированных объектов DaySchedule в расписание
@@ -145,14 +147,12 @@ export async function insertDataInMongoDB(filePath: string): Promise<void> {
         const collection = db.collection<TeacherSchedule>(collectionNameT);
 
         for (const teacherSchedule of teacherSchedules) {
-            const query = { name: teacherSchedule.name };
-            const update = { $set: teacherSchedule };
-            const options = { upsert: true };
-
-            await collection.updateOne(query, update, options);
-        }
-
-        console.log("Данные были успешно вставлены или обновлены в MongoDB");
+            await collection.updateMany(
+              { name: teacherSchedule.name },
+              { $set: teacherSchedule },
+              { upsert: true }
+            );
+          }
     } catch (err) {
         console.error("Произошла ошибка при вставке или обновлении данных в MongoDB:", err);
     } finally {

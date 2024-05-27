@@ -109,8 +109,14 @@ export async function getSchedule(
                 for (const daySchedule of teacher.schedule[weekType]) {
                     // Все пар в дне
                     for (const pair of daySchedule.pairs) {
+                      const fullPair: PairSchedule = {
+                        group: pair.group,
+                        classroom: pair.classroom,
+                        subject: pair.subject,
+                        teacher: teacher.name 
+                      };
                         // Применение фильтра к паре
-                        if (filter(pair)) {
+                        if (filter(fullPair)) {
                             const key = `${weekType}-${daySchedule.dayOfWeek}-${daySchedule.time}-${pair.subject}-${pair.group}-${pair.classroom}`;
                             if (!uniqueEntries.has(key)) {
                                 uniqueEntries.set(key, {
