@@ -24,7 +24,7 @@ async function main() {
     } else if (choice === '2') {
       rl.question('Введите фамилию преподавателя, название группы (например, "22з") или номер аудитории (например, "1-467"): ', async (input) => {
         const groupPattern = /^[0-9]{2}[а-я]{1}$/i; // Регулярное выражение для определения группы
-        const classroomPattern = /^\d{1,2}-\d{3}$/; // Регулярное выражение для определения аудитории
+        const classroomPattern = /^\d{1}-\d{3}$/; // Регулярное выражение для определения аудитории
 
         try {
           if (groupPattern.test(input)) {

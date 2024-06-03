@@ -8,7 +8,7 @@ const dayNames = ['Понедельник', 'Вторник', 'Среда', 'Ч�
 export class HTMLGeneratorT{
     
     static generateTable(schedule: Schedule): string {
-      // Создание строк таблицы
+      // Создание строк таблицы каждого дня недели
       const createRows = (daySchedules: DaySchedule[], dayNames: string[]) => {
         const rows = []; // Массив для хранения строк таблицы
         const dayGroups: Record<string, DaySchedule[]> = {}; // Для группировки расписаний по дням недели
@@ -54,7 +54,6 @@ export class HTMLGeneratorT{
               <td>${pair.classroom}</td>
             `).join(''); // Генерация HTML для пар
   
-            // Добавление строки для оставшихся пар
             rows.push(`
               <tr>
                 <td>${schedule.time}</td>
@@ -120,10 +119,10 @@ export class HTMLGenerator {
         });
 
         // Генерация HTML-таблицы
-        let currentWeekType = ''; 
-        let currentDayOfWeek = ''; 
-        let currentDayRowSpan = 0; 
-        const rows: string[] = []; 
+        let currentWeekType = ''; // Изменение типа недели
+        let currentDayOfWeek = ''; // дня
+        let currentDayRowSpan = 0;  //сколько строк объеденить
+        const rows: string[] = []; // строки таблицы
 
         // Обработка каждой записи расписания
         data.forEach((entry, index) => {
@@ -160,7 +159,7 @@ export class HTMLGenerator {
                 <td>${entry.classroom}</td>
                 </tr>
             `;
-            rows.push(row);
+            rows.push(row); // все строки таблицы
 
             // Обновление rowspan последнего дня недели
             if (index === data.length - 1 || data[index + 1].dayOfWeek !== entry.dayOfWeek) {

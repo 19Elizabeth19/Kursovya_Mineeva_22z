@@ -7,7 +7,7 @@ export interface PairSchedule {
     classroom: string;
     subject: string;
     teacher: string;
-  }
+}
 
 // Интерфейс для расписания на один день
 export interface DaySchedule {
@@ -39,7 +39,7 @@ const splitGroupAndClassroom = (cellContent: string): PairSchedule => {
     const cleanedGroupString = cellContent.replace(/;+/g, ';').replace(/;+$/, '');
 
     // Проверка формата "группа;группа а.аудитория"
-    const groupAndClassroomRegex = /((?:\d{2}[а-яА-Я]~?[;]?)+)\s+а\.(\d{1,2}-\d{3})/i;
+    const groupAndClassroomRegex = /((?:\d{2}[а-яА-Я]~?[;]?)+)\s+а\.(\d{1}-\d{3})/i;
     // Поиск соответствия в строке
     const groupAndClassroomMatch = cleanedGroupString.match(groupAndClassroomRegex);
 
@@ -73,58 +73,47 @@ async function ExcelReader(filePath: string): Promise<TeacherSchedule[]> {
     }
 
     const teacherSchedules: TeacherSchedule[] = [];
-    let currentRow = 7; // Начальная строка для первого преподавателя
+    let currentRow = 7;
 
-    // Цикл по строкам листа, пока не закончатся преподаватели
     while (worksheet.getCell(`B${currentRow}`).value) {
-        // Получаем имя преподавателя из ячейки
         const teacherName = worksheet.getCell(`B${currentRow}`).value as string;
-        // Создаем объект расписания для преподавателя
         const schedule: Schedule = { odd: [], even: [] };
 
-        // Обработка каждого времени
         for (let timeSlotIndex = 0; timeSlotIndex < timeSlots.length; timeSlotIndex++) {
-            const time = timeSlots[timeSlotIndex]; // Время проведения пары
+            const time = timeSlots[timeSlotIndex];
 
-            // Обработка каждого дня недели
             for (let dayIndex = 0; dayIndex < 6; dayIndex++) {
-                // Создаем объекты для расписания на нечетные и четные недели
-                const dayScheduleOdd: DaySchedule = { dayOfWeek: dayNames[dayIndex], time, pairs: [] };
-                const dayScheduleEven: DaySchedule = { dayOfWeek: dayNames[dayIndex], time, pairs: [] };
+                const rowForTimeSlot = currentRow + 2 + timeSlotIndex * 4;
+                const colForDay = 2 + dayIndex;
 
-                // Считывание данных для нечетной и четной недели
-                const rowForTimeSlot = currentRow + 2 + timeSlotIndex * 4; // Строка для времени
-                const colForDay = 2 + dayIndex; // Столбец для дня недели
+                const groupAndClassroomOddCell = worksheet.getCell(rowForTimeSlot, colForDay).text.trim();
+                const subjectOddCell = worksheet.getCell(rowForTimeSlot + 1, colForDay).text.trim();
+                const groupAndClassroomEvenCell = worksheet.getCell(rowForTimeSlot + 2, colForDay).text.trim();
+                const subjectEvenCell = worksheet.getCell(rowForTimeSlot + 3, colForDay).text.trim();
 
-                // Нечетная неделя
-                const groupAndClassroomOdd = worksheet.getCell(rowForTimeSlot, colForDay).text.trim();
-                const subjectOdd = worksheet.getCell(rowForTimeSlot + 1, colForDay).text.trim();
-                // Если есть информация о группе и предмете, добавляем в расписание
-                if (groupAndClassroomOdd && subjectOdd) {
-                    const { group, classroom } = splitGroupAndClassroom(groupAndClassroomOdd);
-                    dayScheduleOdd.pairs.push({ group, classroom, subject: subjectOdd, teacher: teacherName  });
-                }
-
-                // Четная неделя
-                const groupAndClassroomEven = worksheet.getCell(rowForTimeSlot + 2, colForDay).text.trim();
-                const subjectEven = worksheet.getCell(rowForTimeSlot + 3, colForDay).text.trim();
-                // Если есть информация о группе и предмете, добавляем в расписание
-                if (groupAndClassroomEven && subjectEven) {
-                    const { group, classroom } = splitGroupAndClassroom(groupAndClassroomEven);
-                    dayScheduleEven.pairs.push({ group, classroom, subject: subjectEven, teacher: teacherName  });
-                }
-
-                // Добавление сформированных объектов DaySchedule в расписание
-                if (dayScheduleOdd.pairs.length > 0) {
-                    schedule.odd.push(dayScheduleOdd);
-                }
-                if (dayScheduleEven.pairs.length > 0) {
-                    schedule.even.push(dayScheduleEven);
+                // Проверяем, если первая и четвертая ячейки пусты, а вторая и третья содержат информацию
+                if (!groupAndClassroomOddCell && subjectOddCell && groupAndClassroomEvenCell && !subjectEvenCell) {
+                    const { group, classroom } = splitGroupAndClassroom(subjectOddCell);
+                    const subject = groupAndClassroomEvenCell; // Предмет берется из третьей ячейки
+                    const pair = { group, classroom, subject, teacher: teacherName };
+                    // Добавляем пару в обе недели
+                    schedule.odd.push({ dayOfWeek: dayNames[dayIndex], time, pairs: [pair] });
+                    schedule.even.push({ dayOfWeek: dayNames[dayIndex], time, pairs: [pair] });
+                } else {
+                    // Обрабатываем нечетную неделю
+                    if (groupAndClassroomOddCell && subjectOddCell) {
+                        const { group, classroom } = splitGroupAndClassroom(groupAndClassroomOddCell);
+                        schedule.odd.push({ dayOfWeek: dayNames[dayIndex], time, pairs: [{ group, classroom, subject: subjectOddCell, teacher: teacherName }] });
+                    }
+                    // Обрабатываем четную неделю
+                    if (groupAndClassroomEvenCell && subjectEvenCell) {
+                        const { group, classroom } = splitGroupAndClassroom(groupAndClassroomEvenCell);
+                        schedule.even.push({ dayOfWeek: dayNames[dayIndex], time, pairs: [{ group, classroom, subject: subjectEvenCell, teacher: teacherName }] });
+                    }
                 }
             }
         }
-
-        // Добавляем расписание преподавателя в массив
+        
         teacherSchedules.push({ name: teacherName, schedule });
         currentRow += 32; // Переход к следующему преподавателю
     }
@@ -146,13 +135,44 @@ export async function insertDataInMongoDB(filePath: string): Promise<void> {
         const db = client.db(dbName);
         const collection = db.collection<TeacherSchedule>(collectionNameT);
 
-        for (const teacherSchedule of teacherSchedules) {
-            await collection.updateMany(
-              { name: teacherSchedule.name },
-              { $set: teacherSchedule },
-              { upsert: true }
+
+        for (const newTeacherSchedule of teacherSchedules) {
+            // Извлечение существующего расписания преподавателя
+            const existingTeacherSchedule = await collection.findOne({ name: newTeacherSchedule.name });
+            let mergedSchedule;
+    
+            if (existingTeacherSchedule) {
+                // Объединение существующего расписания с новым
+                mergedSchedule = {
+                    odd: existingTeacherSchedule.schedule.odd.concat(newTeacherSchedule.schedule.odd),
+                    even: existingTeacherSchedule.schedule.even.concat(newTeacherSchedule.schedule.even)
+                };
+                // Удаление дубликатов пар
+                mergedSchedule.odd = mergedSchedule.odd.filter((pair, index, self) =>
+                    index === self.findIndex((t) => (  // t - индекс первого элемента в массиве
+                        t.dayOfWeek === pair.dayOfWeek && t.time === pair.time && t.pairs.every((p, i) => p.group === pair.pairs[i].group)
+                    ))
+                );
+                mergedSchedule.even = mergedSchedule.even.filter((pair, index, self) =>
+                    index === self.findIndex((t) => (
+                        t.dayOfWeek === pair.dayOfWeek && t.time === pair.time && t.pairs.every((p, i) => p.group === pair.pairs[i].group)
+                    ))
+                );
+            } else {
+                // Если существующего расписания нет, использовать новое
+                mergedSchedule = newTeacherSchedule.schedule;
+            }
+    
+            // Обновление расписания преподавателя с объединенным расписанием
+            await collection.updateOne(
+                { name: newTeacherSchedule.name },
+                { $set: { schedule: mergedSchedule } },
+                { upsert: true }
             );
-          }
+        }
+        
+        
+          
     } catch (err) {
         console.error("Произошла ошибка при вставке или обновлении данных в MongoDB:", err);
     } finally {
